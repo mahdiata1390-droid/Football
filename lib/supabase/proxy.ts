@@ -22,9 +22,26 @@ export async function updateSession(request: NextRequest) {
   );
 
   const { data: claimsData } = await supabase.auth.getClaims();
-  const isProtected = protectedPaths.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`));
+  const isProtected = protectedPaths.some(
+    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`),
+  );
 
-  if (isProtected && !claimsData?.claims?.sub) {
+  if (!isProtected) return response;
+
+  const userId = claimsData?.claims?.sub;
+  if (!userId) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!profile || !["admin", "teacher"].includes(profile.role)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
