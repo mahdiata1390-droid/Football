@@ -17,3 +17,6 @@ Modern Persian RTL school football management platform built with Next.js.
 4. RLS policies and audit logs
 5. Live match updates and player statistics
 6. Mobile/PWA polish
+
+
+<!-- Android CI trigger: 2026-10-31 -->
