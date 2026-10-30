@@ -62,9 +62,9 @@ export default function Home() {
 
   const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? "تیم";
   const myMatches = matches.filter(m => !selectedTeam || m.home_team_id === selectedTeam || m.away_team_id === selectedTeam);
-  const liveMatches = matches.filter(m => m.status === "live");
   const upcoming = matches.filter(m => m.status === "scheduled").sort((a,b) => new Date(a.scheduled_at ?? 0).getTime() - new Date(b.scheduled_at ?? 0).getTime()).slice(0, 3);
-  const completed = matches.filter(m => m.status === "completed");
+  const completed = matches.filter(m => m.status === "completed").sort((a,b) => new Date(b.scheduled_at ?? 0).getTime() - new Date(a.scheduled_at ?? 0).getTime());
+  const recentResults = completed.slice(0, 6);
   const displayTeams = showAllTeams ? teams : teams.slice(0, 6);
   const leader = rows[0];
 
@@ -77,7 +77,7 @@ export default function Home() {
         <div className="public-actions"><button className="sound-btn" onClick={() => { setSoundOn(v => !v); tapSound(); }}>{soundOn ? "🔊" : "🔇"}</button><button className="teacher-link" onClick={() => { tapSound(); router.push("/login"); }}>پنل معلم</button></div>
       </header>
       <section className="public-hero">
-        <div className="public-hero-copy"><span className="live-badge"><i></i>{liveMatches.length ? "بازی زنده در جریان است" : "لیگ مدرسه آماده شروع است"}</span>
+        <div className="public-hero-copy"><span className="live-badge"><i></i>{recentResults.length ? "آخرین نتایج مدرسه آماده‌اند" : "لیگ مدرسه آماده شروع است"}</span>
           <h1>فوتبال مدرسه،<br/><strong>مثل یک لیگ واقعی.</strong></h1>
           <p>نتایج، جدول، بازی‌های بعدی و عملکرد تیم‌ها؛ همه‌چیز یک‌جا برای بازیکن‌ها، دانش‌آموزها و خانواده‌ها.</p>
           <div className="public-hero-actions"><a href="#matches" className="primary" onClick={tapSound}>مشاهده بازی‌ها</a><a href="#standings" className="ghost" onClick={tapSound}>جدول لیگ</a></div>
@@ -87,12 +87,12 @@ export default function Home() {
       <section className="public-stats">
         <div><span>تیم‌ها</span><strong>{teams.length}</strong><small>تیم فعال</small></div>
         <div><span>بازی‌ها</span><strong>{matches.length}</strong><small>{completed.length} نتیجه ثبت شده</small></div>
-        <div><span>بازی زنده</span><strong>{liveMatches.length}</strong><small>{liveMatches.length ? "همین حالا" : "منتظر شروع"}</small></div>
+        <div><span>نتایج ثبت‌شده</span><strong>{completed.length}</strong><small>برای مرور بعد از مدرسه</small></div>
         <div><span>صدرنشین</span><strong>{leader ? "01" : "—"}</strong><small>{leader?.name ?? "هنوز مشخص نیست"}</small></div>
       </section>
       <section className="public-section" id="matches">
         <div className="section-title"><div><span className="eyebrow">MATCH CENTER</span><h2>مرکز مسابقات</h2></div><span>{matches.length} بازی</span></div>
-        {liveMatches.length > 0 && <div className="live-strip">{liveMatches.map(m => <div className="live-match" key={m.id}><span className="live-dot">LIVE</span><b>{teamName(m.home_team_id)}</b><strong>{m.home_score ?? 0} - {m.away_score ?? 0}</strong><b>{teamName(m.away_team_id)}</b><small>در جریان</small></div>)}</div>}
+        {recentResults.length > 0 && <div className="results-strip">{recentResults.slice(0,3).map(m => <div className="result-chip" key={m.id}><span>نتیجه</span><b>{teamName(m.home_team_id)}</b><strong>{m.home_score ?? 0} - {m.away_score ?? 0}</strong><b>{teamName(m.away_team_id)}</b></div>)}</div>}
         <div className="match-showcase">
           <div className="feature-match"><span className="eyebrow">{upcoming[0] ? "NEXT MATCH" : "LATEST RESULT"}</span>
             {upcoming[0] ? <><small>{new Date(upcoming[0].scheduled_at ?? 0).toLocaleString("fa-IR",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</small><div className="feature-teams"><b>{teamName(upcoming[0].home_team_id)}</b><strong>VS</strong><b>{teamName(upcoming[0].away_team_id)}</b></div><div className="match-pitch"><div>⚽</div></div></> : completed[0] ? <><small>آخرین نتیجه ثبت‌شده</small><div className="feature-teams"><b>{teamName(completed[0].home_team_id)}</b><strong>{completed[0].home_score} — {completed[0].away_score}</strong><b>{teamName(completed[0].away_team_id)}</b></div></> : <div className="empty-state">هنوز مسابقه‌ای ثبت نشده.</div>}
