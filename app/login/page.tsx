@@ -4,7 +4,8 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const AUTH_DOMAIN = "school-football.local";
+const TEACHER_USERNAME = "hajrezayi";
+const TEACHER_EMAIL = "hajrezayi@gmail.com";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,8 +27,14 @@ export default function LoginPage() {
       return;
     }
 
+    if (cleanUsername !== TEACHER_USERNAME) {
+      setError("نام کاربری یا رمز عبور اشتباه است.");
+      setLoading(false);
+      return;
+    }
+
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: `${cleanUsername}@${AUTH_DOMAIN}`,
+      email: TEACHER_EMAIL,
       password,
     });
 
@@ -73,7 +80,7 @@ export default function LoginPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="مثلاً teacher"
+              placeholder="مثلاً Hajrezayi"
             />
           </label>
 
