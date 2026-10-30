@@ -104,7 +104,14 @@ export default function Home() {
         <div className="section-title"><div><span className="eyebrow">THE TEAMS</span><h2>تیم‌های مدرسه</h2></div><button className="text-btn" onClick={() => setShowAllTeams(v => !v)}>{showAllTeams ? "کمتر" : "نمایش همه"}</button></div>
         <div className="public-team-grid">{displayTeams.length ? displayTeams.map((t,i) => { const row=rows.find(r=>r.id===t.id); return <button key={t.id} className="public-team-card" onClick={() => { setSelectedTeam(t.id); tapSound(); document.getElementById("team-area")?.scrollIntoView({behavior:"smooth"}); }}><span className="jersey-number">{String(i+1).padStart(2,"0")}</span><div className="team-emblem">⚽</div><b>{t.name}</b><small>{row ? row.points + " امتیاز · رتبه " + (rows.findIndex(r=>r.id===t.id)+1) : "هنوز بدون نتیجه"}</small></button> }) : <div className="empty-state">هنوز تیمی ثبت نشده.</div>}</div>
       </section>
-      <section className="public-section" id="standings">
+      <section className="public-section football-lounge">
+        <div className="section-title"><div><span className="eyebrow">SEASON HUB</span><h2>نبض لیگ مدرسه</h2></div><span>هر هفته یک داستان جدید</span></div>
+        <div className="lounge-grid">
+          <div className="podium-card"><div className="podium-orbit orbit-a"></div><div className="podium-orbit orbit-b"></div><span className="eyebrow">TOP OF THE TABLE</span><div className="podium-cup">🏆</div><h3>{leader?.name ?? "هنوز صدرنشینی مشخص نیست"}</h3><p>{leader ? leader.points + " امتیاز · " + leader.played + " بازی" : "با ثبت اولین نتایج، اینجا روشن می‌شود."}</p><div className="podium-bars"><i></i><i></i><i></i></div></div>
+          <div className="fan-card"><span className="eyebrow">FAN ZONE</span><h3>مدرسه امروز، ورزشگاه امشب.</h3><p>نتیجه بازی‌ها را بعد از مدرسه چک کن، تیم خودت را دنبال کن و ببین جدول چطور عوض شده.</p><div className="fan-tags"><span>⚽ نتایج</span><span>🏆 جدول</span><span>👕 تیم‌ها</span></div><div className="fan-ball">⚽</div></div>
+        </div>
+      </section>
+
         <div className="section-title"><div><span className="eyebrow">LEAGUE TABLE</span><h2>جدول رده‌بندی</h2></div><span>با نتایج ثبت‌شده</span></div>
         <div className="public-table">{rows.length ? rows.map((r,i) => <div className={r.id === selectedTeam ? "public-row selected" : "public-row"} key={r.id} onClick={() => setSelectedTeam(r.id)}><b>{i+1}</b><span className="rank-ball"></span><strong>{r.name}</strong><span>{r.played} بازی</span><span>{r.gd > 0 ? "+" : ""}{r.gd}</span><em>{r.points}</em></div>) : <div className="empty-state">هنوز نتیجه‌ای ثبت نشده.</div>}</div>
       </section>
@@ -113,6 +120,7 @@ export default function Home() {
         <div className="follow-card"><div className="follow-badge">⚽</div><div><b>{teamName(selectedTeam)}</b><small>{(rows.find(r=>r.id===selectedTeam)?.points ?? 0) + " امتیاز · " + (rows.find(r=>r.id===selectedTeam)?.played ?? 0) + " بازی"}</small></div><div className="follow-actions"><a href="#matches">بازی‌ها</a><a href="#standings">جدول</a></div></div>
         <div className="match-list public-match-list">{myMatches.slice(0,6).map(m => <div className="match" key={m.id}><div className="match-date">{m.scheduled_at ? new Date(m.scheduled_at).toLocaleString("fa-IR",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "بدون زمان"}<span className={m.status === "completed" ? "done" : m.status === "live" ? "live-label" : "next"}>{m.status === "completed" ? "پایان" : m.status === "live" ? "LIVE" : "بعدی"}</span></div><div className="teams"><span>{teamName(m.home_team_id)}</span><b>{m.status === "scheduled" ? "—" : (m.home_score ?? 0) + " - " + (m.away_score ?? 0)}</b><span>{teamName(m.away_team_id)}</span></div></div>)}</div>
       </section>
+      <section className="public-section season-ticker"><div className="ticker-track"><span>⚽ SCHOOL FOOTBALL</span><span>•</span><span>نتیجه بعدی را از دست نده</span><span>•</span><span>🏆 فصل مدرسه</span><span>•</span><span>بازی جوانمردانه، رقابت واقعی</span><span>•</span><span>⚽ SCHOOL FOOTBALL</span></div></section>
       <footer className="public-footer"><div><b>School Football</b><span>لیگ فوتبال مدرسه · نتایج و جدول در یک نگاه</span></div><button className="teacher-link" onClick={() => router.push("/login")}>ورود معلم</button></footer>
     </main>
   );
