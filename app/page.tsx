@@ -76,22 +76,30 @@ export default function Home() {
         <div className="public-brand"><div className="brand-mark">⚽</div><div><b>School Football</b><span>{schoolName}</span></div></div>
         <div className="public-actions"><button className="sound-btn" onClick={() => { setSoundOn(v => !v); tapSound(); }}>{soundOn ? "🔊" : "🔇"}</button><button className="teacher-link" onClick={() => { tapSound(); router.push("/login"); }}>پنل معلم</button></div>
       </header>
-      <section className="public-hero">
+      <section className="public-hero elite-hero">
+        <div className="hero-noise"></div>
         <div className="hero-grid-glow"></div>
-        <div className="public-hero-copy">
-          <span className="live-badge"><i></i>{recentResults.length ? "آخرین نتایج مدرسه آماده‌اند" : "لیگ مدرسه آماده شروع است"}</span>
-          <div className="hero-kicker"><span>⚽ SCHOOL LEAGUE</span><span>SEASON 01</span></div>
-          <h1>فوتبال مدرسه،<br/><strong>مثل یک لیگ واقعی.</strong></h1>
-          <p>تیم خودت را پیدا کن، نتیجه بازی‌ها را ببین و هر هفته جدول را دنبال کن؛ همه‌چیز برای یک فصل فوتبالی واقعی.</p>
-          <div className="public-hero-actions"><a href="#matches" className="primary" onClick={tapSound}>مشاهده بازی‌ها <b>←</b></a><a href="#standings" className="ghost" onClick={tapSound}>جدول لیگ</a></div>
-          <div className="hero-mini-stats"><div><b>{teams.length}</b><span>تیم</span></div><i></i><div><b>{completed.length}</b><span>نتیجه</span></div><i></i><div><b>{upcoming.length}</b><span>بازی بعدی</span></div></div>
+        <div className="hero-copy-glass">
+          <span className="live-badge"><i></i>{recentResults.length ? "آخرین نتایج مدرسه آماده‌اند" : "فصل جدید آماده شروع است"}</span>
+          <div className="hero-kicker"><span>⚽ SCHOOL FOOTBALL</span><span>SEASON 01</span><span>EST. 2026</span></div>
+          <h1>اینجا فقط بازی نیست،<br/><strong>لیگ مدرسه‌ست.</strong></h1>
+          <p>نتیجه‌ها، جدول، تیم‌ها و بازی‌های هفته؛ همه‌چیز با حال‌وهوای یک ورزشگاه واقعی، برای بازیکن‌ها و هوادارهای مدرسه.</p>
+          <div className="public-hero-actions"><a href="#matches" className="primary" onClick={tapSound}>ورود به لیگ <b>←</b></a><a href="#standings" className="ghost" onClick={tapSound}>مشاهده جدول</a></div>
+          <div className="hero-mini-stats"><div><b>{teams.length}</b><span>تیم</span></div><i></i><div><b>{completed.length}</b><span>نتیجه</span></div><i></i><div><b>{upcoming.length}</b><span>بازی پیش‌رو</span></div></div>
         </div>
-        <div className="public-hero-visual" aria-hidden="true">
-          <div className="stadium-photo"></div><div className="stadium-vignette"></div><div className="hero-light"></div>
-          <div className="hero-arc arc-one"></div><div className="hero-arc arc-two"></div>
-          <div className="hero-score-card"><span>RECENT RESULT</span><b>{completed[0] ? teamName(completed[0].home_team_id) : "HOME"}</b><strong>{completed[0] ? (completed[0].home_score ?? 0) + "  —  " + (completed[0].away_score ?? 0) : "VS"}</strong><b>{completed[0] ? teamName(completed[0].away_team_id) : "AWAY"}</b></div>
+        <div className="stadium-stage" aria-hidden="true">
+          <div className="stadium-sky"></div>
+          <div className="stadium-lights"><i></i><i></i><i></i><i></i></div>
+          <div className="stadium-stands stands-back"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div className="stadium-scoreboard"><small>SCHOOL LEAGUE · SEASON 01</small><b>{completed[0] ? teamName(completed[0].home_team_id) : "HOME"} <em>{completed[0] ? (completed[0].home_score ?? 0) + " — " + (completed[0].away_score ?? 0) : "VS"}</em> {completed[0] ? teamName(completed[0].away_team_id) : "AWAY"}</b></div>
+          <div className="stadium-field">
+            <div className="field-half"></div><div className="field-center"></div><div className="field-box field-left"></div><div className="field-box field-right"></div>
+            <div className="field-goal goal-left"></div><div className="field-goal goal-right"></div>
+            <div className="hero-stadium-ball"></div>
+          </div>
+          <div className="stadium-crowd"></div>
           <div className="hero-float-badge"><span>🏆</span><div><b>{leader?.name ?? "رقابت شروع می‌شود"}</b><small>صدر جدول</small></div></div>
-          <div className="hero-3d-ball"></div><div className="hero-ball-shadow"></div>
+          <div className="hero-spotlight"></div>
         </div>
       </section>
       <section className="public-stats">
