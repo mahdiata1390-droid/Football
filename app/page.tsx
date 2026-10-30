@@ -111,7 +111,7 @@ export default function Home() {
           <div className="fan-card"><span className="eyebrow">FAN ZONE</span><h3>مدرسه امروز، ورزشگاه امشب.</h3><p>نتیجه بازی‌ها را بعد از مدرسه چک کن، تیم خودت را دنبال کن و ببین جدول چطور عوض شده.</p><div className="fan-tags"><span>⚽ نتایج</span><span>🏆 جدول</span><span>👕 تیم‌ها</span></div><div className="fan-ball">⚽</div></div>
         </div>
       </section>
-
+      <section className="public-section" id="standings">
         <div className="section-title"><div><span className="eyebrow">LEAGUE TABLE</span><h2>جدول رده‌بندی</h2></div><span>با نتایج ثبت‌شده</span></div>
         <div className="public-table">{rows.length ? rows.map((r,i) => <div className={r.id === selectedTeam ? "public-row selected" : "public-row"} key={r.id} onClick={() => setSelectedTeam(r.id)}><b>{i+1}</b><span className="rank-ball"></span><strong>{r.name}</strong><span>{r.played} بازی</span><span>{r.gd > 0 ? "+" : ""}{r.gd}</span><em>{r.points}</em></div>) : <div className="empty-state">هنوز نتیجه‌ای ثبت نشده.</div>}</div>
       </section>
