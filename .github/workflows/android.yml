@@ -28,10 +28,13 @@ jobs:
           java-version: '21'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
 
       - name: Create Android project
         run: npx cap add android
+
+      - name: Verify Capacitor
+        run: npx cap doctor
 
       - name: Sync Capacitor
         run: npx cap sync android
