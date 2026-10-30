@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-type DashboardTeam = { name: string; played: number; points: number };
+type DashboardTeam = { id: string; name: string; played: number; points: number };
 type DashboardMatch = { home: string; away: string; score: string; status: string; date: string };
 type DashboardPlayer = { id: string; full_name: string; student_code: string | null; position: string | null; team_id: string | null };
 
@@ -83,7 +83,7 @@ export default function AdminPage() {
     setMatchesCount(matchResult.count ?? 0);
     setTournamentsCount(tournamentResult.count ?? 0);
 
-    setTeams((teamResult.data ?? []).slice(0, 4).map((team) => ({ name: team.name, played: 0, points: 0 })));
+    setTeams((teamResult.data ?? []).slice(0, 4).map((team) => ({ id: team.id, name: team.name, played: 0, points: 0 })));
 
     const ids = new Set<string>();
     for (const match of matchResult.data ?? []) {
@@ -160,16 +160,16 @@ export default function AdminPage() {
           <div className="panel-head"><div><span className="eyebrow">SQUAD CONTROL</span><h3>مدیریت بازیکنان</h3></div><span>{players.length} بازیکن</span></div>
           <p className="players-help">معلم می‌تواند هر بازیکن را از تیم فعلی جدا کند و به یک تیم دیگر مدرسه منتقل کند.</p>
           <div className="players-admin-list">{players.length ? players.map(player => {
-            const team = teams.find(t => t.name === player.team_id)?.name;
+            const team = teams.find(t => t.id === player.team_id)?.name;
             const currentTeam = team || "بدون تیم";
-            const actualTeam = player.team_id ? (teams.find(t => (t as DashboardTeam & {id?:string}).id === player.team_id)?.name || currentTeam) : currentTeam;
+            const actualTeam = player.team_id ? (teams.find(t => t.id === player.team_id)?.name || currentTeam) : currentTeam;
             return <article className="player-admin-card" key={player.id}>
               <div className="player-avatar">⚽</div><div className="player-info"><b>{player.full_name}</b><small>{player.position || "بازیکن"} {player.student_code ? "• کد " + player.student_code : ""}</small><span>{actualTeam}</span></div>
               <button className="transfer-btn" onClick={() => { setTransferPlayer(player); setTransferTeam(player.team_id || ""); tapSound(); }}>انتقال</button>
             </article>;
           }) : <div className="empty-state">هنوز بازیکنی ثبت نشده. از بخش کلاس‌ها و تیم‌ها بازیکن اضافه کن.</div>}</div>
         </section> : <section className="empty-panel"><div className="empty-icon">⚽</div><h2>{tab}</h2><p>این بخش از منوی مدیریت باز می‌شود.</p><button className="primary" onClick={() => setTab("داشبورد")}>بازگشت به داشبورد</button></section>}
-        {transferPlayer && <div className="modal-backdrop" onClick={() => setTransferPlayer(null)}><div className="modal transfer-modal" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setTransferPlayer(null)}>×</button><span className="eyebrow">PLAYER TRANSFER</span><h2>انتقال بازیکن</h2><p><b>{transferPlayer.full_name}</b> را به تیم جدید منتقل کن.</p><label>تیم مقصد<select value={transferTeam} onChange={e => setTransferTeam(e.target.value)}><option value="">انتخاب تیم</option>{teams.map(t => <option key={t.name} value={(t as DashboardTeam & {id?:string}).id || ""}>{t.name}</option>)}</select></label><button className="primary full" disabled={!transferTeam || transferBusy} onClick={transferPlayerNow}>{transferBusy ? "در حال انتقال..." : "تأیید انتقال"}</button></div></div>}
+        {transferPlayer && <div className="modal-backdrop" onClick={() => setTransferPlayer(null)}><div className="modal transfer-modal" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setTransferPlayer(null)}>×</button><span className="eyebrow">PLAYER TRANSFER</span><h2>انتقال بازیکن</h2><p><b>{transferPlayer.full_name}</b> را به تیم جدید منتقل کن.</p><label>تیم مقصد<select value={transferTeam} onChange={e => setTransferTeam(e.target.value)}><option value="">انتخاب تیم</option>{teams.map(t => <option key={t.name} value={t.id}>{t.name}</option>)}</select></label><button className="primary full" disabled={!transferTeam || transferBusy} onClick={transferPlayerNow}>{transferBusy ? "در حال انتقال..." : "تأیید انتقال"}</button></div></div>}
         <nav className="mobile-nav" aria-label="ناوبری موبایل">{[["داشبورد","خانه","⌂"],["کلاس‌ها و تیم‌ها","تیم‌ها","👥"],["مسابقات","بازی‌ها","⚽"],["تورنمنت‌ها","جام‌ها","🏆"],["جدول رده‌بندی","جدول","☷"]].map(([item,label,icon]) => <button key={item} className={tab === item ? "active" : ""} onClick={() => { tapSound(); setTab(item); }}><span>{icon}</span><b>{label}</b></button>)}</nav>
       </section>
 
