@@ -22,6 +22,16 @@ export default function AdminPage() {
   const [teams, setTeams] = useState<DashboardTeam[]>([]);
   const [matches, setMatches] = useState<DashboardMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeGlow, setActiveGlow] = useState(false);
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      document.documentElement.style.setProperty("--mx", `${event.clientX}px`);
+      document.documentElement.style.setProperty("--my", `${event.clientY}px`);
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
 
   const loadDashboard = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -112,8 +122,8 @@ export default function AdminPage() {
         <header className="topbar"><div><span className="eyebrow">TEACHER PANEL</span><h1>{tab}</h1><p>فقط معلم می‌تواند اطلاعات مسابقات را تغییر دهد.</p></div><div className="top-actions"><button className="profile-btn">{profileName.slice(0, 1)}</button></div></header>
 
         {tab === "داشبورد" ? <>
-          <section className="hero"><div><span className="pill">● حالت مدیریت فعال</span><h2>وقتشه لیگ مدرسه رو شروع کنیم.</h2><p>تیم‌ها، بازیکن‌ها، مسابقات و تورنمنت‌ها را از این پنل مدیریت کن.</p><div className="hero-actions"><button className="primary" onClick={() => setShowTeam(true)}>+ ساخت تیم جدید</button><button className="ghost" onClick={() => router.push("/tournaments")}>ساخت تورنمنت</button></div></div><div className="hero-ball">⚽</div></section>
-          <div className="stats"><div><span>تیم‌های فعال</span><strong>{teamsCount}</strong><small>از دیتابیس مدرسه</small></div><div><span>مسابقات</span><strong>{matchesCount}</strong><small>برنامه‌ریزی و انجام‌شده</small></div><div><span>بازیکنان</span><strong>{playersCount}</strong><small>ثبت‌شده در مدرسه</small></div><div><span>تورنمنت‌ها</span><strong>{tournamentsCount}</strong><small>لیگ و جام حذفی</small></div></div>
+          <section className={`hero ${activeGlow ? "goal-glow" : ""}`} onMouseEnter={() => setActiveGlow(true)} onMouseLeave={() => setActiveGlow(false)}><div><span className="pill">● حالت مدیریت فعال</span><h2>وقتشه لیگ مدرسه رو شروع کنیم.</h2><p>تیم‌ها، بازیکن‌ها، مسابقات و تورنمنت‌ها را از این پنل مدیریت کن.</p><div className="hero-actions"><button className="primary" onClick={() => setShowTeam(true)}>+ ساخت تیم جدید</button><button className="ghost" onClick={() => router.push("/tournaments")}>ساخت تورنمنت</button></div></div><div className="hero-ball">⚽</div></section>
+          <div className="stats"><div className="stat-card"><span>تیم‌های فعال</span><strong>{teamsCount}</strong><small>از دیتابیس مدرسه</small></div><div className="stat-card"><span>مسابقات</span><strong>{matchesCount}</strong><small>برنامه‌ریزی و انجام‌شده</small></div><div className="stat-card"><span>بازیکنان</span><strong>{playersCount}</strong><small>ثبت‌شده در مدرسه</small></div><div className="stat-card"><span>تورنمنت‌ها</span><strong>{tournamentsCount}</strong><small>لیگ و جام حذفی</small></div></div>
           <div className="grid-2"><section className="panel"><div className="panel-head"><div><span className="eyebrow">LIVE BOARD</span><h3>بازی‌های اخیر</h3></div><button className="text-btn" onClick={() => router.push("/matches")}>همه مسابقات ←</button></div><div className="match-list">{matches.length ? matches.map((m, i) => <div className="match" key={i}><div className="match-date">{m.date}<span className={m.status === "پایان یافته" ? "done" : "next"}>{m.status}</span></div><div className="teams"><span>{m.home}</span><b>{m.score}</b><span>{m.away}</span></div></div>) : <div className="empty-state">هنوز مسابقه‌ای ثبت نشده.</div>}</div></section>
           <section className="panel"><div className="panel-head"><div><span className="eyebrow">TOP TABLE</span><h3>جدول رده‌بندی</h3></div><button className="text-btn" onClick={() => router.push("/standings")}>مشاهده جدول ←</button></div><div className="table">{teams.length ? teams.map((t, i) => <div className="row" key={t.name}><b className="rank">{i + 1}</b><div className="team-dot"></div><span className="team-name">{t.name}</span><span>{t.played}</span><strong>{t.points}</strong></div>) : <div className="empty-state">اولین تیم مدرسه را بساز.</div>}</div></section></div>
           <section className="panel tournaments"><div className="panel-head"><div><span className="eyebrow">COMPETITIONS</span><h3>تورنمنت‌های مدرسه</h3></div><button className="text-btn" onClick={() => setTab("تورنمنت‌ها")}>مدیریت تورنمنت‌ها ←</button></div><div className="tournament-grid"><article><span className="t-icon">🏆</span><div><b>لیگ فوتبال مدرسه</b><p>{teamsCount} تیم • {matchesCount} مسابقه</p></div><span className="status live">{tournamentsCount ? "فعال" : "آماده راه‌اندازی"}</span></article></div></section>
