@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'ir.schoolfootball.app',
   appName: 'School Football',
-  webDir: '.',
+  webDir: 'public',
   server: {
     url: 'https://school-football.vercel.app',
     cleartext: false
