@@ -17,6 +17,17 @@ export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState("");
   const [schoolName, setSchoolName] = useState("مدرسه");
   const [loading, setLoading] = useState(true);
+  const [soundOn, setSoundOn] = useState(true);
+  const [showAllTeams, setShowAllTeams] = useState(false);
+  function tapSound() {
+    if (!soundOn || typeof window === "undefined") return;
+    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx(); const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = "sine"; osc.frequency.setValueAtTime(480, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(720, ctx.currentTime + 0.055);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + 0.008); gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.07);
+    osc.connect(gain).connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.075); window.setTimeout(() => void ctx.close(), 120);
+  }
 
   const load = useCallback(async () => {
     const [{ data: school }, { data: teamData }, { data: matchData }] = await Promise.all([
@@ -51,45 +62,58 @@ export default function Home() {
 
   const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? "تیم";
   const myMatches = matches.filter(m => !selectedTeam || m.home_team_id === selectedTeam || m.away_team_id === selectedTeam);
+  const liveMatches = matches.filter(m => m.status === "live");
+  const upcoming = matches.filter(m => m.status === "scheduled").sort((a,b) => new Date(a.scheduled_at ?? 0).getTime() - new Date(b.scheduled_at ?? 0).getTime()).slice(0, 3);
+  const completed = matches.filter(m => m.status === "completed");
+  const displayTeams = showAllTeams ? teams : teams.slice(0, 6);
+  const leader = rows[0];
 
   if (loading) return <main className="auth-page" dir="rtl"><div className="auth-card"><div className="brand-mark">⚽</div><h1>در حال بارگذاری لیگ مدرسه...</h1><p className="auth-subtitle">نتایج و جدول در حال دریافت است.</p></div></main>;
 
   return (
-    <main className="manage-page" dir="rtl">
-      <header className="manage-header">
-        <div><span className="eyebrow">SCHOOL FOOTBALL</span><h1>{schoolName}</h1><p>نتایج، جدول و وضعیت تیم‌های مسابقات مدرسه</p></div>
-        <button className="primary" onClick={() => router.push("/login")}>ورود معلم</button>
+    <main className="public-home" dir="rtl">
+      <header className="public-header">
+        <div className="public-brand"><div className="brand-mark">⚽</div><div><b>School Football</b><span>{schoolName}</span></div></div>
+        <div className="public-actions"><button className="sound-btn" onClick={() => { setSoundOn(v => !v); tapSound(); }}>{soundOn ? "🔊" : "🔇"}</button><button className="teacher-link" onClick={() => { tapSound(); router.push("/login"); }}>پنل معلم</button></div>
       </header>
-
-      <section className="manage-card" style={{ marginBottom: 20 }}>
-        <div className="panel-head"><div><span className="eyebrow">MY TEAM</span><h2>تیم خودت را انتخاب کن</h2></div></div>
-        <div className="team-picker">
-          {teams.length ? teams.map(t => <button className={selectedTeam === t.id ? "selected" : ""} key={t.id} onClick={() => setSelectedTeam(t.id)}>{selectedTeam === t.id ? "✓ " : ""}{t.name}</button>) : <div className="empty-state">هنوز تیمی ثبت نشده.</div>}
+      <section className="public-hero">
+        <div className="public-hero-copy"><span className="live-badge"><i></i>{liveMatches.length ? "بازی زنده در جریان است" : "لیگ مدرسه آماده شروع است"}</span>
+          <h1>فوتبال مدرسه،<br/><strong>مثل یک لیگ واقعی.</strong></h1>
+          <p>نتایج، جدول، بازی‌های بعدی و عملکرد تیم‌ها؛ همه‌چیز یک‌جا برای بازیکن‌ها، دانش‌آموزها و خانواده‌ها.</p>
+          <div className="public-hero-actions"><a href="#matches" className="primary" onClick={tapSound}>مشاهده بازی‌ها</a><a href="#standings" className="ghost" onClick={tapSound}>جدول لیگ</a></div>
+        </div>
+        <div className="public-hero-visual" aria-hidden="true"><div className="stadium-photo"></div><div className="hero-3d-ball"></div><div className="hero-light"></div></div>
+      </section>
+      <section className="public-stats">
+        <div><span>تیم‌ها</span><strong>{teams.length}</strong><small>تیم فعال</small></div>
+        <div><span>بازی‌ها</span><strong>{matches.length}</strong><small>{completed.length} نتیجه ثبت شده</small></div>
+        <div><span>بازی زنده</span><strong>{liveMatches.length}</strong><small>{liveMatches.length ? "همین حالا" : "منتظر شروع"}</small></div>
+        <div><span>صدرنشین</span><strong>{leader ? "01" : "—"}</strong><small>{leader?.name ?? "هنوز مشخص نیست"}</small></div>
+      </section>
+      <section className="public-section" id="matches">
+        <div className="section-title"><div><span className="eyebrow">MATCH CENTER</span><h2>مرکز مسابقات</h2></div><span>{matches.length} بازی</span></div>
+        {liveMatches.length > 0 && <div className="live-strip">{liveMatches.map(m => <div className="live-match" key={m.id}><span className="live-dot">LIVE</span><b>{teamName(m.home_team_id)}</b><strong>{m.home_score ?? 0} - {m.away_score ?? 0}</strong><b>{teamName(m.away_team_id)}</b><small>در جریان</small></div>)}</div>}
+        <div className="match-showcase">
+          <div className="feature-match"><span className="eyebrow">{upcoming[0] ? "NEXT MATCH" : "LATEST RESULT"}</span>
+            {upcoming[0] ? <><small>{new Date(upcoming[0].scheduled_at ?? 0).toLocaleString("fa-IR",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</small><div className="feature-teams"><b>{teamName(upcoming[0].home_team_id)}</b><strong>VS</strong><b>{teamName(upcoming[0].away_team_id)}</b></div><div className="match-pitch"><div>⚽</div></div></> : completed[0] ? <><small>آخرین نتیجه ثبت‌شده</small><div className="feature-teams"><b>{teamName(completed[0].home_team_id)}</b><strong>{completed[0].home_score} — {completed[0].away_score}</strong><b>{teamName(completed[0].away_team_id)}</b></div></> : <div className="empty-state">هنوز مسابقه‌ای ثبت نشده.</div>}
+          </div>
+          <div className="upcoming-list"><h3>بازی‌های پیش‌رو</h3>{upcoming.length ? upcoming.map(m => <div className="upcoming-card" key={m.id}><div className="fixture-time">{new Date(m.scheduled_at ?? 0).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})}</div><span>{teamName(m.home_team_id)}</span><b>VS</b><span>{teamName(m.away_team_id)}</span></div>) : <div className="empty-state">بازی بعدی هنوز مشخص نشده.</div>}</div>
         </div>
       </section>
-
-      <div className="grid-2">
-        <section className="panel">
-          <div className="panel-head"><div><span className="eyebrow">TEAM MATCHES</span><h3>بازی‌های تیم</h3></div></div>
-          <div className="match-list">
-            {myMatches.length ? myMatches.slice(0,8).map(m => <div className="match" key={m.id}>
-              <div className="match-date">{m.scheduled_at ? new Date(m.scheduled_at).toLocaleString("fa-IR", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "بدون زمان"}<span className={m.status === "completed" ? "done" : "next"}>{m.status === "completed" ? "پایان یافته" : "برنامه‌ریزی شده"}</span></div>
-              <div className="teams"><span>{teamName(m.home_team_id)}</span><b>{m.status === "scheduled" ? "—" : `${m.home_score} - ${m.away_score}`}</b><span>{teamName(m.away_team_id)}</span></div>
-            </div>) : <div className="empty-state">برای این تیم مسابقه‌ای ثبت نشده.</div>}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-head"><div><span className="eyebrow">LEAGUE TABLE</span><h3>جدول رده‌بندی</h3></div></div>
-          <div className="table">
-            {rows.length ? rows.map((r,i) => <div className="row" key={r.id}><b className="rank">{i+1}</b><div className="team-dot"></div><span className="team-name">{r.name}</span><span>{r.played}</span><strong>{r.points}</strong></div>) : <div className="empty-state">هنوز نتیجه‌ای ثبت نشده.</div>}
-          </div>
-        </section>
-      </div>
-
-      <section className="panel" style={{ marginTop: 20 }}>
-        <div className="panel-head"><div><span className="eyebrow">PUBLIC VIEW</span><h3>فقط مشاهده</h3></div><small>تغییر اطلاعات فقط از پنل معلم امکان‌پذیر است.</small></div>
+      <section className="public-section teams-section">
+        <div className="section-title"><div><span className="eyebrow">THE TEAMS</span><h2>تیم‌های مدرسه</h2></div><button className="text-btn" onClick={() => setShowAllTeams(v => !v)}>{showAllTeams ? "کمتر" : "نمایش همه"}</button></div>
+        <div className="public-team-grid">{displayTeams.length ? displayTeams.map((t,i) => { const row=rows.find(r=>r.id===t.id); return <button key={t.id} className="public-team-card" onClick={() => { setSelectedTeam(t.id); tapSound(); document.getElementById("team-area")?.scrollIntoView({behavior:"smooth"}); }}><span className="jersey-number">{String(i+1).padStart(2,"0")}</span><div className="team-emblem">⚽</div><b>{t.name}</b><small>{row ? row.points + " امتیاز · رتبه " + (rows.findIndex(r=>r.id===t.id)+1) : "هنوز بدون نتیجه"}</small></button> }) : <div className="empty-state">هنوز تیمی ثبت نشده.</div>}</div>
       </section>
+      <section className="public-section" id="standings">
+        <div className="section-title"><div><span className="eyebrow">LEAGUE TABLE</span><h2>جدول رده‌بندی</h2></div><span>با نتایج ثبت‌شده</span></div>
+        <div className="public-table">{rows.length ? rows.map((r,i) => <div className={r.id === selectedTeam ? "public-row selected" : "public-row"} key={r.id} onClick={() => setSelectedTeam(r.id)}><b>{i+1}</b><span className="rank-ball"></span><strong>{r.name}</strong><span>{r.played} بازی</span><span>{r.gd > 0 ? "+" : ""}{r.gd}</span><em>{r.points}</em></div>) : <div className="empty-state">هنوز نتیجه‌ای ثبت نشده.</div>}</div>
+      </section>
+      <section className="public-section team-focus" id="team-area">
+        <div className="section-title"><div><span className="eyebrow">TEAM FOLLOW</span><h2>{teamName(selectedTeam)}</h2></div><span>بازی‌های تیم</span></div>
+        <div className="follow-card"><div className="follow-badge">⚽</div><div><b>{teamName(selectedTeam)}</b><small>{(rows.find(r=>r.id===selectedTeam)?.points ?? 0) + " امتیاز · " + (rows.find(r=>r.id===selectedTeam)?.played ?? 0) + " بازی"}</small></div><div className="follow-actions"><a href="#matches">بازی‌ها</a><a href="#standings">جدول</a></div></div>
+        <div className="match-list public-match-list">{myMatches.slice(0,6).map(m => <div className="match" key={m.id}><div className="match-date">{m.scheduled_at ? new Date(m.scheduled_at).toLocaleString("fa-IR",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "بدون زمان"}<span className={m.status === "completed" ? "done" : m.status === "live" ? "live-label" : "next"}>{m.status === "completed" ? "پایان" : m.status === "live" ? "LIVE" : "بعدی"}</span></div><div className="teams"><span>{teamName(m.home_team_id)}</span><b>{m.status === "scheduled" ? "—" : (m.home_score ?? 0) + " - " + (m.away_score ?? 0)}</b><span>{teamName(m.away_team_id)}</span></div></div>)}</div>
+      </section>
+      <footer className="public-footer"><div><b>School Football</b><span>لیگ فوتبال مدرسه · نتایج و جدول در یک نگاه</span></div><button className="teacher-link" onClick={() => router.push("/login")}>ورود معلم</button></footer>
     </main>
   );
 }
