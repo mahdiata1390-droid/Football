@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -19,15 +19,70 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [soundOn, setSoundOn] = useState(true);
   const [showAllTeams, setShowAllTeams] = useState(false);
-  function tapSound() {
-    if (!soundOn || typeof window === "undefined") return;
+  const audioRef = useRef<AudioContext | null>(null);
+
+  function playSound(kind: "tap" | "whoosh" | "success" = "tap", force = false) {
+    if ((!soundOn && !force) || typeof window === "undefined") return;
     const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtx) return;
-    const ctx = new AudioCtx(); const osc = ctx.createOscillator(); const gain = ctx.createGain();
-    osc.type = "sine"; osc.frequency.setValueAtTime(480, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(720, ctx.currentTime + 0.055);
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + 0.008); gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.07);
-    osc.connect(gain).connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.075); window.setTimeout(() => void ctx.close(), 120);
+
+    try {
+      const ctx = audioRef.current ?? new AudioCtx();
+      audioRef.current = ctx;
+      if (ctx.state === "suspended") void ctx.resume();
+
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(kind === "success" ? 0.075 : 0.055, now + 0.008);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + (kind === "whoosh" ? 0.16 : 0.12));
+      master.connect(ctx.destination);
+
+      if (kind === "whoosh") {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(720, now + 0.13);
+        osc.connect(master);
+        osc.start(now);
+        osc.stop(now + 0.17);
+      } else if (kind === "success") {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+        osc.connect(master);
+        osc.start(now);
+        osc.stop(now + 0.13);
+
+        const chime = ctx.createOscillator();
+        const chimeGain = ctx.createGain();
+        chime.type = "sine";
+        chime.frequency.setValueAtTime(1040, now + 0.07);
+        chimeGain.gain.setValueAtTime(0.0001, now);
+        chimeGain.gain.exponentialRampToValueAtTime(0.045, now + 0.08);
+        chimeGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.19);
+        chime.connect(chimeGain).connect(ctx.destination);
+        chime.start(now + 0.06);
+        chime.stop(now + 0.2);
+      } else {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(420, now);
+        osc.frequency.exponentialRampToValueAtTime(690, now + 0.055);
+        osc.connect(master);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      }
+    } catch {
+      // Audio is an enhancement; UI must still work if the browser blocks it.
+    }
   }
+
+  useEffect(() => () => {
+    const ctx = audioRef.current;
+    if (ctx && ctx.state !== "closed") void ctx.close();
+  }, []);
 
   const load = useCallback(async () => {
     const [{ data: school }, { data: teamData }, { data: matchData }] = await Promise.all([
@@ -74,7 +129,7 @@ export default function Home() {
     <main className="public-home" dir="rtl">
       <header className="public-header">
         <div className="public-brand"><div className="brand-mark">⚽</div><div><b>School Football</b><span>{schoolName}</span></div></div>
-        <div className="public-actions"><button className="sound-btn" onClick={() => { setSoundOn(v => !v); tapSound(); }}>{soundOn ? "🔊" : "🔇"}</button><button className="teacher-link" onClick={() => { tapSound(); router.push("/login"); }}>پنل معلم</button></div>
+        <div className="public-actions"><button className="sound-btn" onClick={() => { setSoundOn(v => !v); playSound("tap", true); }}>{soundOn ? "🔊" : "🔇"}</button><button className="teacher-link" onClick={() => { playSound("whoosh"); router.push("/login"); }}>پنل معلم</button></div>
       </header>
       <section className="public-hero elite-hero">
         <div className="hero-noise"></div>
@@ -84,7 +139,7 @@ export default function Home() {
           <div className="hero-kicker"><span>⚽ SCHOOL FOOTBALL</span><span>SEASON 01</span><span>EST. 2026</span></div>
           <h1>اینجا فقط بازی نیست،<br/><strong>لیگ مدرسه‌ست.</strong></h1>
           <p>نتیجه‌ها، جدول، تیم‌ها و بازی‌های هفته؛ همه‌چیز با حال‌وهوای یک ورزشگاه واقعی، برای بازیکن‌ها و هوادارهای مدرسه.</p>
-          <div className="public-hero-actions"><a href="#matches" className="primary" onClick={tapSound}>ورود به لیگ <b>←</b></a><a href="#standings" className="ghost" onClick={tapSound}>مشاهده جدول</a></div>
+          <div className="public-hero-actions"><a href="#matches" className="primary" onClick={() => playSound("whoosh")}>ورود به لیگ <b>←</b></a><a href="#standings" className="ghost" onClick={() => playSound("whoosh")}>مشاهده جدول</a></div>
           <div className="hero-mini-stats"><div><b>{teams.length}</b><span>تیم</span></div><i></i><div><b>{completed.length}</b><span>نتیجه</span></div><i></i><div><b>{upcoming.length}</b><span>بازی پیش‌رو</span></div></div>
         </div>
         <div className="stadium-stage" aria-hidden="true">
@@ -119,8 +174,8 @@ export default function Home() {
         </div>
       </section>
       <section className="public-section teams-section">
-        <div className="section-title"><div><span className="eyebrow">THE TEAMS</span><h2>تیم‌های مدرسه</h2></div><button className="text-btn" onClick={() => setShowAllTeams(v => !v)}>{showAllTeams ? "کمتر" : "نمایش همه"}</button></div>
-        <div className="public-team-grid">{displayTeams.length ? displayTeams.map((t,i) => { const row=rows.find(r=>r.id===t.id); return <button key={t.id} className="public-team-card" onClick={() => { setSelectedTeam(t.id); tapSound(); document.getElementById("team-area")?.scrollIntoView({behavior:"smooth"}); }}><span className="jersey-number">{String(i+1).padStart(2,"0")}</span><div className="team-emblem">⚽</div><b>{t.name}</b><small>{row ? row.points + " امتیاز · رتبه " + (rows.findIndex(r=>r.id===t.id)+1) : "هنوز بدون نتیجه"}</small></button> }) : <div className="empty-state">هنوز تیمی ثبت نشده.</div>}</div>
+        <div className="section-title"><div><span className="eyebrow">THE TEAMS</span><h2>تیم‌های مدرسه</h2></div><button className="text-btn" onClick={() => { setShowAllTeams(v => !v); playSound("tap"); }}>{showAllTeams ? "کمتر" : "نمایش همه"}</button></div>
+        <div className="public-team-grid">{displayTeams.length ? displayTeams.map((t,i) => { const row=rows.find(r=>r.id===t.id); return <button key={t.id} className="public-team-card" onClick={() => { setSelectedTeam(t.id); playSound("success"); document.getElementById("team-area")?.scrollIntoView({behavior:"smooth"}); }}><span className="jersey-number">{String(i+1).padStart(2,"0")}</span><div className="team-emblem">⚽</div><b>{t.name}</b><small>{row ? row.points + " امتیاز · رتبه " + (rows.findIndex(r=>r.id===t.id)+1) : "هنوز بدون نتیجه"}</small></button> }) : <div className="empty-state">هنوز تیمی ثبت نشده.</div>}</div>
       </section>
       <section className="public-section football-lounge">
         <div className="section-title"><div><span className="eyebrow">SEASON HUB</span><h2>نبض لیگ مدرسه</h2></div><span>هر هفته یک داستان جدید</span></div>
@@ -131,15 +186,15 @@ export default function Home() {
       </section>
       <section className="public-section" id="standings">
         <div className="section-title"><div><span className="eyebrow">LEAGUE TABLE</span><h2>جدول رده‌بندی</h2></div><span>با نتایج ثبت‌شده</span></div>
-        <div className="public-table">{rows.length ? rows.map((r,i) => <div className={r.id === selectedTeam ? "public-row selected" : "public-row"} key={r.id} onClick={() => setSelectedTeam(r.id)}><b>{i+1}</b><span className="rank-ball"></span><strong>{r.name}</strong><span>{r.played} بازی</span><span>{r.gd > 0 ? "+" : ""}{r.gd}</span><em>{r.points}</em></div>) : <div className="empty-state">هنوز نتیجه‌ای ثبت نشده.</div>}</div>
+        <div className="public-table">{rows.length ? rows.map((r,i) => <div className={r.id === selectedTeam ? "public-row selected" : "public-row"} key={r.id} onClick={() => { setSelectedTeam(r.id); playSound("tap"); }}><b>{i+1}</b><span className="rank-ball"></span><strong>{r.name}</strong><span>{r.played} بازی</span><span>{r.gd > 0 ? "+" : ""}{r.gd}</span><em>{r.points}</em></div>) : <div className="empty-state">هنوز نتیجه‌ای ثبت نشده.</div>}</div>
       </section>
       <section className="public-section team-focus" id="team-area">
         <div className="section-title"><div><span className="eyebrow">TEAM FOLLOW</span><h2>{teamName(selectedTeam)}</h2></div><span>بازی‌های تیم</span></div>
-        <div className="follow-card"><div className="follow-badge">⚽</div><div><b>{teamName(selectedTeam)}</b><small>{(rows.find(r=>r.id===selectedTeam)?.points ?? 0) + " امتیاز · " + (rows.find(r=>r.id===selectedTeam)?.played ?? 0) + " بازی"}</small></div><div className="follow-actions"><a href="#matches">بازی‌ها</a><a href="#standings">جدول</a></div></div>
+        <div className="follow-card"><div className="follow-badge">⚽</div><div><b>{teamName(selectedTeam)}</b><small>{(rows.find(r=>r.id===selectedTeam)?.points ?? 0) + " امتیاز · " + (rows.find(r=>r.id===selectedTeam)?.played ?? 0) + " بازی"}</small></div><div className="follow-actions"><a href="#matches" onClick={() => playSound("whoosh")}>بازی‌ها</a><a href="#standings" onClick={() => playSound("whoosh")}>جدول</a></div></div>
         <div className="match-list public-match-list">{myMatches.slice(0,6).map(m => <div className="match" key={m.id}><div className="match-date">{m.scheduled_at ? new Date(m.scheduled_at).toLocaleString("fa-IR",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "بدون زمان"}<span className={m.status === "completed" ? "done" : m.status === "live" ? "live-label" : "next"}>{m.status === "completed" ? "پایان" : m.status === "live" ? "LIVE" : "بعدی"}</span></div><div className="teams"><span>{teamName(m.home_team_id)}</span><b>{m.status === "scheduled" ? "—" : (m.home_score ?? 0) + " - " + (m.away_score ?? 0)}</b><span>{teamName(m.away_team_id)}</span></div></div>)}</div>
       </section>
       <section className="public-section season-ticker"><div className="ticker-track"><span>⚽ SCHOOL FOOTBALL</span><span>•</span><span>نتیجه بعدی را از دست نده</span><span>•</span><span>🏆 فصل مدرسه</span><span>•</span><span>بازی جوانمردانه، رقابت واقعی</span><span>•</span><span>⚽ SCHOOL FOOTBALL</span></div></section>
-      <footer className="public-footer"><div><b>School Football</b><span>لیگ فوتبال مدرسه · نتایج و جدول در یک نگاه</span></div><button className="teacher-link" onClick={() => router.push("/login")}>ورود معلم</button></footer>
+      <footer className="public-footer"><div><b>School Football</b><span>لیگ فوتبال مدرسه · نتایج و جدول در یک نگاه</span></div><button className="teacher-link" onClick={() => { playSound("whoosh"); router.push("/login"); }}>ورود معلم</button></footer>
     </main>
   );
 }
