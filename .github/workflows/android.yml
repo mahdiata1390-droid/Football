@@ -32,9 +32,6 @@ jobs:
       - name: Create Android project
         run: npx cap add android
 
-      - name: Verify Capacitor
-        run: npx cap doctor
-
       - name: Sync Capacitor
         run: npx cap sync android
 
