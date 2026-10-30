@@ -22,6 +22,26 @@ export default function AdminPage() {
   const [teams, setTeams] = useState<DashboardTeam[]>([]);
   const [matches, setMatches] = useState<DashboardMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [soundOn, setSoundOn] = useState(true);
+
+  function tapSound() {
+    if (!soundOn || typeof window === "undefined") return;
+    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(520, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(760, ctx.currentTime + 0.06);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.055, ctx.currentTime + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.075);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.08);
+    window.setTimeout(() => void ctx.close(), 120);
+  }
 
   const loadDashboard = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -109,16 +129,16 @@ export default function AdminPage() {
       </aside>
 
       <section className="content">
-        <header className="topbar"><div><span className="eyebrow">TEACHER PANEL</span><h1>{tab}</h1><p>فقط معلم می‌تواند اطلاعات مسابقات را تغییر دهد.</p></div><div className="top-actions"><button className="profile-btn">{profileName.slice(0, 1)}</button></div></header>
+        <header className="topbar"><div><span className="eyebrow">TEACHER PANEL</span><h1>{tab}</h1><p>فقط معلم می‌تواند اطلاعات مسابقات را تغییر دهد.</p></div><div className="top-actions"><button className="sound-btn" aria-label={soundOn ? "خاموش کردن صدا" : "روشن کردن صدا"} onClick={() => { setSoundOn(v => !v); tapSound(); }}>{soundOn ? "🔊" : "🔇"}</button><button className="profile-btn">{profileName.slice(0, 1)}</button></div></header>
 
         {tab === "داشبورد" ? <>
-          <section className="hero"><div><span className="pill">● حالت مدیریت فعال</span><h2>وقتشه لیگ مدرسه رو شروع کنیم.</h2><p>تیم‌ها، بازیکن‌ها، مسابقات و تورنمنت‌ها را از این پنل مدیریت کن.</p><div className="hero-actions"><button className="primary" onClick={() => setShowTeam(true)}>+ ساخت تیم جدید</button><button className="ghost" onClick={() => router.push("/tournaments")}>ساخت تورنمنت</button></div></div><div className="hero-ball">⚽</div></section>
+          <section className="hero"><div className="hero-copy"><span className="pill">● حالت مدیریت فعال</span><h2>وقتشه لیگ مدرسه رو شروع کنیم.</h2><p>تیم‌ها، بازیکن‌ها، مسابقات و تورنمنت‌ها را از این پنل مدیریت کن.</p><div className="hero-actions"><button className="primary" onClick={() => { tapSound(); setShowTeam(true); }}>+ ساخت تیم جدید</button><button className="ghost" onClick={() => { tapSound(); router.push("/tournaments"); }}>ساخت تورنمنت</button></div></div><div className="hero-media" aria-hidden="true"><div className="real-ball"><span></span></div><div className="stadium-lights"></div></div></section>
           <div className="stats"><div className="stat-card"><span>تیم‌های فعال</span><strong>{teamsCount}</strong><small>از دیتابیس مدرسه</small></div><div className="stat-card"><span>مسابقات</span><strong>{matchesCount}</strong><small>برنامه‌ریزی و انجام‌شده</small></div><div className="stat-card"><span>بازیکنان</span><strong>{playersCount}</strong><small>ثبت‌شده در مدرسه</small></div><div className="stat-card"><span>تورنمنت‌ها</span><strong>{tournamentsCount}</strong><small>لیگ و جام حذفی</small></div></div>
           <div className="grid-2"><section className="panel"><div className="panel-head"><div><span className="eyebrow">LIVE BOARD</span><h3>بازی‌های اخیر</h3></div><button className="text-btn" onClick={() => router.push("/matches")}>همه مسابقات ←</button></div><div className="match-list">{matches.length ? matches.map((m, i) => <div className="match" key={i}><div className="match-date">{m.date}<span className={m.status === "پایان یافته" ? "done" : "next"}>{m.status}</span></div><div className="teams"><span>{m.home}</span><b>{m.score}</b><span>{m.away}</span></div></div>) : <div className="empty-state">هنوز مسابقه‌ای ثبت نشده.</div>}</div></section>
           <section className="panel"><div className="panel-head"><div><span className="eyebrow">TOP TABLE</span><h3>جدول رده‌بندی</h3></div><button className="text-btn" onClick={() => router.push("/standings")}>مشاهده جدول ←</button></div><div className="table">{teams.length ? teams.map((t, i) => <div className="row" key={t.name}><b className="rank">{i + 1}</b><div className="team-dot"></div><span className="team-name">{t.name}</span><span>{t.played}</span><strong>{t.points}</strong></div>) : <div className="empty-state">اولین تیم مدرسه را بساز.</div>}</div></section></div>
-          <section className="panel tournaments"><div className="panel-head"><div><span className="eyebrow">COMPETITIONS</span><h3>تورنمنت‌های مدرسه</h3></div><button className="text-btn" onClick={() => setTab("تورنمنت‌ها")}>مدیریت تورنمنت‌ها ←</button></div><div className="tournament-grid"><article><span className="t-icon">🏆</span><div><b>لیگ فوتبال مدرسه</b><p>{teamsCount} تیم • {matchesCount} مسابقه</p></div><span className="status live">{tournamentsCount ? "فعال" : "آماده راه‌اندازی"}</span></article></div></section>
+          <section className="panel tournaments"><div className="panel-head"><div><span className="eyebrow">COMPETITIONS</span><h3>تورنمنت‌های مدرسه</h3></div><button className="text-btn" onClick={() => { tapSound(); setTab("تورنمنت‌ها"); }}>مدیریت تورنمنت‌ها ←</button></div><div className="tournament-grid"><article><span className="t-icon">🏆</span><div><b>لیگ فوتبال مدرسه</b><p>{teamsCount} تیم • {matchesCount} مسابقه</p></div><span className="status live">{tournamentsCount ? "فعال" : "آماده راه‌اندازی"}</span></article></div></section>
         </> : <section className="empty-panel"><div className="empty-icon">⚽</div><h2>{tab}</h2><p>این بخش از منوی مدیریت باز می‌شود.</p><button className="primary" onClick={() => setTab("داشبورد")}>بازگشت به داشبورد</button></section>}
-        <nav className="mobile-nav" aria-label="ناوبری موبایل">{["داشبورد","کلاس‌ها و تیم‌ها","مسابقات","تورنمنت‌ها","جدول رده‌بندی","بازیکنان"].map(item => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}><span>{item === "داشبورد" ? "⌂" : item === "مسابقات" ? "⚽" : item === "تورنمنت‌ها" ? "🏆" : item === "بازیکنان" ? "♟" : item === "جدول رده‌بندی" ? "☷" : "👥"}</span>{item}</button>)}</nav>
+        <nav className="mobile-nav" aria-label="ناوبری موبایل">{[["داشبورد","خانه","⌂"],["کلاس‌ها و تیم‌ها","تیم‌ها","👥"],["مسابقات","بازی‌ها","⚽"],["تورنمنت‌ها","جام‌ها","🏆"],["جدول رده‌بندی","جدول","☷"]].map(([item,label,icon]) => <button key={item} className={tab === item ? "active" : ""} onClick={() => { tapSound(); setTab(item); }}><span>{icon}</span><b>{label}</b></button>)}</nav>
       </section>
 
       {showTeam && <div className="modal-backdrop" onClick={() => setShowTeam(false)}><div className="modal" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setShowTeam(false)}>×</button><span className="eyebrow">TEAM SETUP</span><h2>ساخت تیم جدید</h2><p>تیم جدید مستقیماً در دیتابیس مدرسه ذخیره می‌شود.</p><label>نام تیم<input value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="مثلاً کلاس ۱۰/۲" /></label><button className="primary full" onClick={createTeam}>ایجاد تیم</button></div></div>}
