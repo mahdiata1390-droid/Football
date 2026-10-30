@@ -4,12 +4,13 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const AUTH_DOMAIN = "school-football.local";
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"login" | "signup">("login");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -18,24 +19,38 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const result =
-      mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
-
-    if (result.error) {
-      setError(result.error.message);
+    const cleanUsername = username.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9_.-]{3,40}$/.test(cleanUsername)) {
+      setError("نام کاربری باید ۳ تا ۴۰ کاراکتر و فقط شامل حروف، عدد، نقطه، خط تیره یا زیرخط باشد.");
       setLoading(false);
       return;
     }
 
-    if (mode === "signup" && !result.data.session) {
-      setError("حساب ساخته شد. اگر تأیید ایمیل فعال باشد، ایمیلت را تأیید کن و بعد وارد شو.");
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: `${cleanUsername}@${AUTH_DOMAIN}`,
+      password,
+    });
+
+    if (authError || !data.user) {
+      setError("نام کاربری یا رمز عبور اشتباه است.");
       setLoading(false);
       return;
     }
 
-    router.push(mode === "signup" ? "/setup" : "/");
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (!profile || !["admin", "teacher"].includes(profile.role)) {
+      await supabase.auth.signOut();
+      setError("این حساب اجازه ورود به پنل معلم را ندارد.");
+      setLoading(false);
+      return;
+    }
+
+    router.push("/admin");
     router.refresh();
   }
 
@@ -43,24 +58,22 @@ export default function LoginPage() {
     <main className="auth-page" dir="rtl">
       <div className="auth-card">
         <div className="brand-mark">⚽</div>
-        <span className="eyebrow">SCHOOL FOOTBALL</span>
-        <h1>{mode === "login" ? "ورود به پنل فوتبال مدرسه" : "ساخت حساب مدیر"}</h1>
-        <p className="auth-subtitle">
-          {mode === "login"
-            ? "مدیریت تیم‌ها، کلاس‌ها و مسابقات از یک‌جا."
-            : "اولین حساب ثبت‌نام‌شده می‌تواند مدرسه را راه‌اندازی کند."}
-        </p>
+        <span className="eyebrow">TEACHER ACCESS</span>
+        <h1>ورود معلم</h1>
+        <p className="auth-subtitle">فقط حساب معلم به پنل مدیریت دسترسی دارد.</p>
 
         <form onSubmit={submit} className="auth-form">
           <label>
-            ایمیل
+            نام کاربری
             <input
-              type="email"
+              type="text"
               required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="teacher@school.ir"
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="مثلاً teacher"
             />
           </label>
 
@@ -69,24 +82,20 @@ export default function LoginPage() {
             <input
               type="password"
               required
-              minLength={6}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="حداقل ۶ کاراکتر"
+              placeholder="رمز عبور"
             />
           </label>
 
           {error && <div className="form-error">{error}</div>}
-
           <button className="primary-btn" disabled={loading}>
-            {loading ? "در حال بررسی..." : mode === "login" ? "ورود" : "ساخت حساب"}
+            {loading ? "در حال بررسی..." : "ورود به پنل"}
           </button>
         </form>
 
-        <button className="text-btn" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
-          {mode === "login" ? "حساب مدیر ندارید؟ ساخت حساب" : "حساب دارید؟ ورود"}
-        </button>
+        <button className="text-btn" onClick={() => router.push("/")}>← مشاهده نتایج مدرسه</button>
       </div>
     </main>
   );
