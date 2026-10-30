@@ -14,10 +14,10 @@ export default function ManagePage(){
  const [classes,setClasses]=useState<ClassRow[]>([]);
  const [players,setPlayers]=useState<Player[]>([]);
  const [name,setName]=useState(""); const [classId,setClassId]=useState("");
- const [busy,setBusy]=useState(true); const [message,setMessage]=useState("");
+ const [busy,setBusy]=useState(true); const [message,setMessage]=useState(""); const [schoolId,setSchoolId]=useState("");
 
  const load=useCallback(async()=>{
-  setBusy(true);
+  setBusy(true); const {data:userData}=await supabase.auth.getUser(); if(userData.user){const {data:profile}=await supabase.from("profiles").select("school_id").eq("id",userData.user.id).single(); if(profile)setSchoolId(profile.school_id);}
   const [t,c,p]=await Promise.all([
    supabase.from("teams").select("id,name,class_id").order("created_at",{ascending:false}),
    supabase.from("classes").select("id,name,grade,section").order("created_at",{ascending:false}),
@@ -31,9 +31,9 @@ export default function ManagePage(){
   if(!name.trim())return;
   setMessage("");
   let error;
-  if(tab==="teams") ({error}=await supabase.from("teams").insert({name:name.trim(),class_id:classId||null}));
-  if(tab==="classes") ({error}=await supabase.from("classes").insert({name:name.trim()}));
-  if(tab==="players") ({error}=await supabase.from("players").insert({full_name:name.trim(),team_id:classId||null}));
+  if(tab==="teams") ({error}=await supabase.from("teams").insert({school_id:schoolId,name:name.trim(),class_id:classId||null}));
+  if(tab==="classes") ({error}=await supabase.from("classes").insert({school_id:schoolId,name:name.trim()}));
+  if(tab==="players") ({error}=await supabase.from("players").insert({school_id:schoolId,full_name:name.trim(),team_id:classId||null}));
   if(error)setMessage(error.message); else {setName("");setClassId("");await load()}
  }
  async function remove(table:string,id:string){await supabase.from(table).delete().eq("id",id);await load()}
