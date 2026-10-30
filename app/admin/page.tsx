@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type DashboardTeam = { name: string; played: number; points: number };
 type DashboardMatch = { home: string; away: string; score: string; status: string; date: string };
+type DashboardPlayer = { id: string; full_name: string; student_code: string | null; position: string | null; team_id: string | null };
 
 export default function AdminPage() {
   const router = useRouter();
@@ -23,6 +24,10 @@ export default function AdminPage() {
   const [matches, setMatches] = useState<DashboardMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [soundOn, setSoundOn] = useState(true);
+  const [players, setPlayers] = useState<DashboardPlayer[]>([]);
+  const [transferPlayer, setTransferPlayer] = useState<DashboardPlayer | null>(null);
+  const [transferTeam, setTransferTeam] = useState("");
+  const [transferBusy, setTransferBusy] = useState(false);
 
   function tapSound() {
     if (!soundOn || typeof window === "undefined") return;
@@ -67,13 +72,14 @@ export default function AdminPage() {
 
     const [teamResult, playerResult, matchResult, tournamentResult] = await Promise.all([
       supabase.from("teams").select("id,name", { count: "exact" }).limit(100),
-      supabase.from("players").select("id", { count: "exact", head: true }),
+      supabase.from("players").select("id,full_name,student_code,position,team_id").order("full_name").limit(200),
       supabase.from("matches").select("id,home_team_id,away_team_id,home_score,away_score,status,scheduled_at", { count: "exact" }).order("scheduled_at", { ascending: false, nullsFirst: false }).limit(3),
       supabase.from("tournaments").select("id", { count: "exact", head: true }),
     ]);
 
     setTeamsCount(teamResult.count ?? 0);
-    setPlayersCount(playerResult.count ?? 0);
+    setPlayersCount(playerResult.data?.length ?? 0);
+    setPlayers((playerResult.data ?? []) as DashboardPlayer[]);
     setMatchesCount(matchResult.count ?? 0);
     setTournamentsCount(tournamentResult.count ?? 0);
 
@@ -101,6 +107,19 @@ export default function AdminPage() {
   }, [router, supabase]);
 
   useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+
+  async function transferPlayerNow() {
+    if (!transferPlayer || !transferTeam || transferBusy) return;
+    setTransferBusy(true);
+    const { error } = await supabase.from("players").update({ team_id: transferTeam }).eq("id", transferPlayer.id);
+    setTransferBusy(false);
+    if (!error) {
+      setPlayers(current => current.map(p => p.id === transferPlayer.id ? { ...p, team_id: transferTeam } : p));
+      setTransferPlayer(null);
+      setTransferTeam("");
+      tapSound();
+    }
+  }
 
   async function createTeam() {
     if (!teamName.trim()) return;
@@ -137,7 +156,20 @@ export default function AdminPage() {
           <div className="grid-2"><section className="panel"><div className="panel-head"><div><span className="eyebrow">LIVE BOARD</span><h3>بازی‌های اخیر</h3></div><button className="text-btn" onClick={() => router.push("/matches")}>همه مسابقات ←</button></div><div className="match-list">{matches.length ? matches.map((m, i) => <div className="match" key={i}><div className="match-date">{m.date}<span className={m.status === "پایان یافته" ? "done" : "next"}>{m.status}</span></div><div className="teams"><span>{m.home}</span><b>{m.score}</b><span>{m.away}</span></div></div>) : <div className="empty-state">هنوز مسابقه‌ای ثبت نشده.</div>}</div></section>
           <section className="panel"><div className="panel-head"><div><span className="eyebrow">TOP TABLE</span><h3>جدول رده‌بندی</h3></div><button className="text-btn" onClick={() => router.push("/standings")}>مشاهده جدول ←</button></div><div className="table">{teams.length ? teams.map((t, i) => <div className="row" key={t.name}><b className="rank">{i + 1}</b><div className="team-dot"></div><span className="team-name">{t.name}</span><span>{t.played}</span><strong>{t.points}</strong></div>) : <div className="empty-state">اولین تیم مدرسه را بساز.</div>}</div></section></div>
           <section className="panel tournaments"><div className="panel-head"><div><span className="eyebrow">COMPETITIONS</span><h3>تورنمنت‌های مدرسه</h3></div><button className="text-btn" onClick={() => { tapSound(); setTab("تورنمنت‌ها"); }}>مدیریت تورنمنت‌ها ←</button></div><div className="tournament-grid"><article><span className="t-icon">🏆</span><div><b>لیگ فوتبال مدرسه</b><p>{teamsCount} تیم • {matchesCount} مسابقه</p></div><span className="status live">{tournamentsCount ? "فعال" : "آماده راه‌اندازی"}</span></article></div></section>
-        </> : <section className="empty-panel"><div className="empty-icon">⚽</div><h2>{tab}</h2><p>این بخش از منوی مدیریت باز می‌شود.</p><button className="primary" onClick={() => setTab("داشبورد")}>بازگشت به داشبورد</button></section>}
+        </> : tab === "بازیکنان" ? <section className="panel players-admin-panel">
+          <div className="panel-head"><div><span className="eyebrow">SQUAD CONTROL</span><h3>مدیریت بازیکنان</h3></div><span>{players.length} بازیکن</span></div>
+          <p className="players-help">معلم می‌تواند هر بازیکن را از تیم فعلی جدا کند و به یک تیم دیگر مدرسه منتقل کند.</p>
+          <div className="players-admin-list">{players.length ? players.map(player => {
+            const team = teams.find(t => t.name === player.team_id)?.name;
+            const currentTeam = team || "بدون تیم";
+            const actualTeam = player.team_id ? (teams.find(t => (t as DashboardTeam & {id?:string}).id === player.team_id)?.name || currentTeam) : currentTeam;
+            return <article className="player-admin-card" key={player.id}>
+              <div className="player-avatar">⚽</div><div className="player-info"><b>{player.full_name}</b><small>{player.position || "بازیکن"} {player.student_code ? "• کد " + player.student_code : ""}</small><span>{actualTeam}</span></div>
+              <button className="transfer-btn" onClick={() => { setTransferPlayer(player); setTransferTeam(player.team_id || ""); tapSound(); }}>انتقال</button>
+            </article>;
+          }) : <div className="empty-state">هنوز بازیکنی ثبت نشده. از بخش کلاس‌ها و تیم‌ها بازیکن اضافه کن.</div>}</div>
+        </section> : <section className="empty-panel"><div className="empty-icon">⚽</div><h2>{tab}</h2><p>این بخش از منوی مدیریت باز می‌شود.</p><button className="primary" onClick={() => setTab("داشبورد")}>بازگشت به داشبورد</button></section>}
+        {transferPlayer && <div className="modal-backdrop" onClick={() => setTransferPlayer(null)}><div className="modal transfer-modal" onClick={e => e.stopPropagation()}><button className="close" onClick={() => setTransferPlayer(null)}>×</button><span className="eyebrow">PLAYER TRANSFER</span><h2>انتقال بازیکن</h2><p><b>{transferPlayer.full_name}</b> را به تیم جدید منتقل کن.</p><label>تیم مقصد<select value={transferTeam} onChange={e => setTransferTeam(e.target.value)}><option value="">انتخاب تیم</option>{teams.map(t => <option key={t.name} value={(t as DashboardTeam & {id?:string}).id || ""}>{t.name}</option>)}</select></label><button className="primary full" disabled={!transferTeam || transferBusy} onClick={transferPlayerNow}>{transferBusy ? "در حال انتقال..." : "تأیید انتقال"}</button></div></div>}
         <nav className="mobile-nav" aria-label="ناوبری موبایل">{[["داشبورد","خانه","⌂"],["کلاس‌ها و تیم‌ها","تیم‌ها","👥"],["مسابقات","بازی‌ها","⚽"],["تورنمنت‌ها","جام‌ها","🏆"],["جدول رده‌بندی","جدول","☷"]].map(([item,label,icon]) => <button key={item} className={tab === item ? "active" : ""} onClick={() => { tapSound(); setTab(item); }}><span>{icon}</span><b>{label}</b></button>)}</nav>
       </section>
 
