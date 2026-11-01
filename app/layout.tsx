@@ -20,21 +20,10 @@ export const metadata: Metadata = {
     description: "نتایج، جدول، تیم‌ها و مسابقات فوتبال مدرسه در یک صفحه.",
     locale: "fa_IR"
   },
-  twitter: {
-    card: "summary",
-    title: "لیگ فوتبال مدرسه | School Football",
-    description: "نتایج، جدول، تیم‌ها و مسابقات فوتبال مدرسه."
-  },
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1
-    }
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 }
   }
 };
 
