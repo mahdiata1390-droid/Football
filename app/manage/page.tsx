@@ -6,24 +6,29 @@ import { createClient } from "@/lib/supabase/client";
 type Team={id:string;name:string;class_id:string|null};
 type ClassRow={id:string;name:string;grade:string|null;section:string|null};
 type Player={id:string;full_name:string;position:string|null;team_id:string|null;class_id:string|null};
+type Match={id:string;home_team_id:string;away_team_id:string;scheduled_at:string|null;status:string;home_score:number|null;away_score:number|null};
+type Stat={player_id:string;match_id:string;goals:number;fair_play_points:number};
 
 export default function ManagePage(){
  const supabase=createClient();
- const [tab,setTab]=useState<"teams"|"classes"|"players">("teams");
+ const [tab,setTab]=useState<"teams"|"classes"|"players"|"stats">("teams");
  const [teams,setTeams]=useState<Team[]>([]);
  const [classes,setClasses]=useState<ClassRow[]>([]);
  const [players,setPlayers]=useState<Player[]>([]);
  const [name,setName]=useState(""); const [classId,setClassId]=useState("");
  const [busy,setBusy]=useState(true); const [message,setMessage]=useState(""); const [schoolId,setSchoolId]=useState("");
+ const [matches,setMatches]=useState<Match[]>([]); const [stats,setStats]=useState<Stat[]>([]); const [selectedMatch,setSelectedMatch]=useState("");
 
  const load=useCallback(async()=>{
   setBusy(true); const {data:userData}=await supabase.auth.getUser(); if(userData.user){const {data:profile}=await supabase.from("profiles").select("school_id").eq("id",userData.user.id).single(); if(profile)setSchoolId(profile.school_id);}
-  const [t,c,p]=await Promise.all([
+  const [t,c,p,m,s]=await Promise.all([
    supabase.from("teams").select("id,name,class_id").order("created_at",{ascending:false}),
    supabase.from("classes").select("id,name,grade,section").order("created_at",{ascending:false}),
-   supabase.from("players").select("id,full_name,position,team_id,class_id").order("created_at",{ascending:false})
+   supabase.from("players").select("id,full_name,position,team_id,class_id").order("created_at",{ascending:false}),
+   supabase.from("matches").select("id,home_team_id,away_team_id,scheduled_at,status,home_score,away_score").eq("status","completed").order("scheduled_at",{ascending:false}),
+   supabase.from("player_match_stats").select("player_id,match_id,goals,fair_play_points")
   ]);
-  setTeams(t.data??[]);setClasses(c.data??[]);setPlayers(p.data??[]);setBusy(false);
+  setTeams(t.data??[]);setClasses(c.data??[]);setPlayers(p.data??[]);setMatches(m.data??[]);setStats(s.data??[]);setBusy(false);
  },[supabase]);
  useEffect(()=>{void load()},[load]);
 
@@ -37,10 +42,20 @@ export default function ManagePage(){
   if(error)setMessage(error.message); else {setName("");setClassId("");await load()}
  }
  async function remove(table:string,id:string){await supabase.from(table).delete().eq("id",id);await load()}
+ const selected=matches.find(m=>m.id===selectedMatch);
+ const statPlayers=selected?players.filter(p=>p.team_id===selected.home_team_id||p.team_id===selected.away_team_id):[];
+ const currentStat=(playerId:string)=>stats.find(s=>s.match_id===selectedMatch&&s.player_id===playerId);
+ async function saveStat(playerId:string,field:"goals"|"fair_play_points",value:number){
+   if(!selectedMatch||!schoolId)return;
+   const old=currentStat(playerId);
+   const payload={school_id:schoolId,match_id:selectedMatch,player_id:playerId,goals:old?.goals??0,fair_play_points:old?.fair_play_points??0,[field]:Math.max(0,value)};
+   const {error}=await supabase.from("player_match_stats").upsert(payload,{onConflict:"match_id,player_id"});
+   if(error)setMessage(error.message); else await load();
+ }
 
  return <main className="manage-page" dir="rtl">
   <header className="manage-header"><div><span className="eyebrow">SCHOOL MANAGEMENT</span><h1>مدیریت مدرسه</h1><p>کلاس‌ها، تیم‌ها و بازیکن‌ها را از همین‌جا مدیریت کن.</p></div><a href="/" className="back-link">← داشبورد</a></header>
-  <div className="manage-tabs">{[["teams","تیم‌ها"],["classes","کلاس‌ها"],["players","بازیکنان"]].map(([id,label])=><button className={tab===id?"active":""} onClick={()=>setTab(id as typeof tab)} key={id}>{label}</button>)}</div>
+  <div className="manage-tabs">{[["teams","تیم‌ها"],["classes","کلاس‌ها"],["players","بازیکنان"],["stats","آمار بازی"]].map(([id,label])=><button className={tab===id?"active":""} onClick={()=>setTab(id as typeof tab)} key={id}>{label}</button>)}</div>
   <section className="manage-card">
    <div className="create-row"><input value={name} onChange={e=>setName(e.target.value)} placeholder={tab==="teams"?"نام تیم":tab==="classes"?"نام کلاس":"نام بازیکن"}/>{tab==="teams"&&<select value={classId} onChange={e=>setClassId(e.target.value)}><option value="">بدون کلاس</option>{classes.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select>}{tab==="players"&&<select value={classId} onChange={e=>setClassId(e.target.value)}><option value="">تیم بازیکن</option>{teams.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select>}<button className="primary" onClick={add}>+ افزودن</button></div>
    {message&&<div className="form-error">{message}</div>}
