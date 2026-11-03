@@ -4,14 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-type Team = { id: string; name: string };
-type Match = { id: string; home_team_id: string; away_team_id: string; home_score: number | null; away_score: number | null; status: string; scheduled_at: string | null };
-type Row = { id: string; name: string; played: number; wins: number; draws: number; losses: number; gf: number; ga: number; gd: number; points: number };
+type Team = { id: string; name: string; class_id: string | null };
+type SchoolClass = { id: string; name: string; grade: string | null; section: string | null };
+type Player = { id: string; full_name: string; class_id: string | null; team_id: string | null };
+type PlayerStat = { player_id: string; match_id: string; goals: number; fair_play_points: number };
+type Match = { id: string; home_team_id: string; away_team_id: string; home_score: number | null; away_score: number | null; status: string; scheduled_at: string | null; tournament_id?: string | null };
+type Row = { id: string; name: string; class_id: string | null; played: number; wins: number; draws: number; losses: number; gf: number; ga: number; gd: number; points: number };
 
 export default function Home() {
   const router = useRouter();
   const supabase = createClient();
   const [teams, setTeams] = useState<Team[]>([]);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [playerStats, setPlayerStats] = useState<PlayerStat[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [selectedTeam, setSelectedTeam] = useState("");
@@ -85,21 +91,27 @@ export default function Home() {
   }, []);
 
   const load = useCallback(async () => {
-    const [{ data: school }, { data: teamData }, { data: matchData }] = await Promise.all([
+    const [{ data: school }, { data: teamData }, { data: matchData }, { data: classData }, { data: playerData }, { data: statData }] = await Promise.all([
       supabase.from("schools").select("name").limit(1).maybeSingle(),
-      supabase.from("teams").select("id,name").order("name"),
-      supabase.from("matches").select("id,home_team_id,away_team_id,home_score,away_score,status,scheduled_at").order("scheduled_at", { ascending: false, nullsFirst: false }).limit(30),
+      supabase.from("teams").select("id,name,class_id").order("name"),
+      supabase.from("matches").select("id,home_team_id,away_team_id,home_score,away_score,status,scheduled_at,tournament_id").order("scheduled_at", { ascending: false, nullsFirst: false }).limit(50),
+      supabase.from("classes").select("id,name,grade,section").order("name"),
+      supabase.from("players").select("id,full_name,class_id,team_id").order("full_name"),
+      supabase.from("player_match_stats").select("player_id,match_id,goals,fair_play_points"),
     ]);
 
     if (school?.name) setSchoolName(school.name);
     const nextTeams = teamData ?? [];
     const nextMatches = matchData ?? [];
     setTeams(nextTeams);
+    setClasses(classData ?? []);
+    setPlayers(playerData ?? []);
+    setPlayerStats(statData ?? []);
     if (!selectedTeam && nextTeams[0]) setSelectedTeam(nextTeams[0].id);
     setMatches(nextMatches);
 
     const table = new Map<string, Row>();
-    for (const team of nextTeams) table.set(team.id, { id: team.id, name: team.name, played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, gd: 0, points: 0 });
+    for (const team of nextTeams) table.set(team.id, { id: team.id, name: team.name, class_id: team.class_id, played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, gd: 0, points: 0 });
     for (const m of nextMatches) {
       if (m.status !== "completed" || m.home_score == null || m.away_score == null) continue;
       const h = table.get(m.home_team_id), a = table.get(m.away_team_id);
@@ -116,12 +128,21 @@ export default function Home() {
   useEffect(() => { void load(); }, [load]);
 
   const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? "تیم";
+  const teamClass = (id: string) => { const t = teams.find(x => x.id === id); const c = classes.find(x => x.id === t?.class_id); return c?.name ?? "بدون کلاس"; };
+  const playerName = (id: string) => players.find(p => p.id === id)?.full_name ?? "بازیکن";
+  const className = (id: string | null) => classes.find(c => c.id === id)?.name ?? "بدون کلاس";
+  const scorerTotals = new Map<string, { player_id: string; goals: number; fair: number }>();
+  for (const s of playerStats) { const prev = scorerTotals.get(s.player_id) ?? { player_id: s.player_id, goals: 0, fair: 0 }; prev.goals += s.goals; prev.fair += s.fair_play_points; scorerTotals.set(s.player_id, prev); }
+  const topScorers = [...scorerTotals.values()].sort((a,b) => b.goals-a.goals || b.fair-a.fair).slice(0, 8);
+  const fairPlayers = [...scorerTotals.values()].sort((a,b) => b.fair-a.fair || b.goals-a.goals).slice(0, 5);
+  const classGroups = classes.map(cls => ({ cls, rows: rows.filter(r => r.class_id === cls.id).sort((a,b) => b.points-a.points || b.gd-a.gd), scorer: topScorers.find(s => players.find(p => p.id === s.player_id)?.class_id === cls.id) }));
   const myMatches = matches.filter(m => !selectedTeam || m.home_team_id === selectedTeam || m.away_team_id === selectedTeam);
   const upcoming = matches.filter(m => m.status === "scheduled").sort((a,b) => new Date(a.scheduled_at ?? 0).getTime() - new Date(b.scheduled_at ?? 0).getTime()).slice(0, 3);
   const completed = matches.filter(m => m.status === "completed").sort((a,b) => new Date(b.scheduled_at ?? 0).getTime() - new Date(a.scheduled_at ?? 0).getTime());
   const recentResults = completed.slice(0, 6);
   const displayTeams = showAllTeams ? teams : teams.slice(0, 6);
   const leader = rows[0];
+  const annualTournament = matches.length ? null : null;
 
   if (loading) return <main className="auth-page" dir="rtl"><div className="auth-card"><div className="brand-mark">⚽</div><h1>در حال بارگذاری لیگ مدرسه...</h1><p className="auth-subtitle">نتایج و جدول در حال دریافت است.</p></div></main>;
 
@@ -165,12 +186,12 @@ export default function Home() {
       </section>
       <section className="public-section" id="matches">
         <div className="section-title"><div><span className="eyebrow">MATCH CENTER</span><h2>مرکز مسابقات</h2></div><span>{matches.length} بازی</span></div>
-        {recentResults.length > 0 && <div className="results-strip">{recentResults.slice(0,3).map(m => <div className="result-chip" key={m.id}><span>نتیجه</span><b>{teamName(m.home_team_id)}</b><strong>{m.home_score ?? 0} - {m.away_score ?? 0}</strong><b>{teamName(m.away_team_id)}</b></div>)}</div>}
+        {recentResults.length > 0 && <div className="results-strip">{recentResults.slice(0,3).map(m => <div className="result-chip" key={m.id}><span>نتیجه</span><b>{teamName(m.home_team_id)}</b><strong>{m.home_score ?? 0} - {m.away_score ?? 0}</strong><b>{teamName(m.away_team_id)}</b><small>{teamClass(m.home_team_id)} · {teamClass(m.away_team_id)}</small></div>)}</div>}
         <div className="match-showcase">
           <div className="feature-match"><span className="eyebrow">{upcoming[0] ? "NEXT MATCH" : "LATEST RESULT"}</span>
             {upcoming[0] ? <><small>{new Date(upcoming[0].scheduled_at ?? 0).toLocaleString("fa-IR",{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</small><div className="feature-teams"><b>{teamName(upcoming[0].home_team_id)}</b><strong>VS</strong><b>{teamName(upcoming[0].away_team_id)}</b></div><div className="match-pitch"><div>⚽</div></div></> : completed[0] ? <><small>آخرین نتیجه ثبت‌شده</small><div className="feature-teams"><b>{teamName(completed[0].home_team_id)}</b><strong>{completed[0].home_score} — {completed[0].away_score}</strong><b>{teamName(completed[0].away_team_id)}</b></div></> : <div className="empty-state">هنوز مسابقه‌ای ثبت نشده.</div>}
           </div>
-          <div className="upcoming-list"><h3>بازی‌های پیش‌رو</h3>{upcoming.length ? upcoming.map(m => <div className="upcoming-card" key={m.id}><div className="fixture-time">{new Date(m.scheduled_at ?? 0).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})}</div><span>{teamName(m.home_team_id)}</span><b>VS</b><span>{teamName(m.away_team_id)}</span></div>) : <div className="empty-state">بازی بعدی هنوز مشخص نشده.</div>}</div>
+          <div className="upcoming-list"><h3>بازی‌های پیش‌رو</h3>{upcoming.length ? upcoming.map(m => <div className="upcoming-card" key={m.id}><div className="fixture-time">{new Date(m.scheduled_at ?? 0).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})}</div><span>{teamName(m.home_team_id)}<small>{teamClass(m.home_team_id)}</small></span><b>VS</b><span>{teamName(m.away_team_id)}<small>{teamClass(m.away_team_id)}</small></span></div>) : <div className="empty-state">بازی بعدی هنوز مشخص نشده.</div>}</div>
         </div>
       </section>
       <section className="public-section teams-section">
@@ -184,6 +205,22 @@ export default function Home() {
           <div className="fan-card"><span className="eyebrow">FAN ZONE</span><h3>مدرسه امروز، ورزشگاه امشب.</h3><p>نتیجه بازی‌ها را بعد از مدرسه چک کن، تیم خودت را دنبال کن و ببین جدول چطور عوض شده.</p><div className="fan-tags"><span>⚽ نتایج</span><span>🏆 جدول</span><span>👕 تیم‌ها</span></div><div className="fan-ball">⚽</div></div>
         </div>
       </section>
+      <section className="public-section class-leagues">
+        <div className="section-title"><div><span className="eyebrow">CLASS LEAGUES</span><h2>لیگ‌های کلاس‌ها</h2></div><span>هر کلاس، لیگ خودش</span></div>
+        <div className="class-league-grid">{classGroups.filter(g => g.rows.length || g.scorer).map(g => <article className="class-league-card" key={g.cls.id}>
+          <div className="class-league-head"><div><span>لیگ کلاس</span><h3>{g.cls.name}</h3></div><b>⚽</b></div>
+          <div className="class-league-table">{g.rows.length ? g.rows.slice(0,4).map((r,i)=><div key={r.id}><strong>{i+1}</strong><span>{r.name}</span><b>{r.points}</b></div>) : <p>هنوز نتیجه‌ای ثبت نشده.</p>}</div>
+          <div className="class-top-scorer"><span>آقای گل کلاس</span><b>{g.scorer ? playerName(g.scorer.player_id) : "هنوز مشخص نیست"}</b><small>{g.scorer ? g.scorer.goals + " گل" : "با ثبت آمار بازی‌ها مشخص می‌شود"}</small></div>
+        </article>)}</div>
+      </section>
+      <section className="public-section awards-section">
+        <div className="section-title"><div><span className="eyebrow">SEASON AWARDS</span><h2>جوایز فصل</h2></div><span>قهرمان‌ها و ستاره‌های مدرسه</span></div>
+        <div className="award-grid">
+          <article className="award-card gold"><span>🥇</span><small>آقای گل مدرسه</small><h3>{topScorers[0] ? playerName(topScorers[0].player_id) : "هنوز مشخص نیست"}</h3><b>{topScorers[0] ? topScorers[0].goals + " گل" : "آمار گل‌ها بعد از ثبت مسابقات"}</b></article>
+          <article className="award-card fair"><span>🤝</span><small>آقای اخلاق</small><h3>{fairPlayers[0] ? playerName(fairPlayers[0].player_id) : "هنوز مشخص نیست"}</h3><b>{fairPlayers[0] ? fairPlayers[0].fair + " امتیاز اخلاق" : "امتیازهای Fair Play بعد از هر بازی"}</b></article>
+          <article className="award-card cup"><span>🏆</span><small>جام سالانه مدرسه</small><h3>{leader?.name ?? "قهرمان سال"}</h3><b>تورنمنت سالانه کل مدرسه</b></article>
+        </div>
+      </section>
       <section className="public-section" id="standings">
         <div className="section-title"><div><span className="eyebrow">LEAGUE TABLE</span><h2>جدول رده‌بندی</h2></div><span>با نتایج ثبت‌شده</span></div>
         <div className="public-table">{rows.length ? rows.map((r,i) => <div className={r.id === selectedTeam ? "public-row selected" : "public-row"} key={r.id} onClick={() => { setSelectedTeam(r.id); playSound("tap"); }}><b>{i+1}</b><span className="rank-ball"></span><strong>{r.name}</strong><span>{r.played} بازی</span><span>{r.gd > 0 ? "+" : ""}{r.gd}</span><em>{r.points}</em></div>) : <div className="empty-state">هنوز نتیجه‌ای ثبت نشده.</div>}</div>
@@ -191,7 +228,7 @@ export default function Home() {
       <section className="public-section team-focus" id="team-area">
         <div className="section-title"><div><span className="eyebrow">TEAM FOLLOW</span><h2>{teamName(selectedTeam)}</h2></div><span>بازی‌های تیم</span></div>
         <div className="follow-card"><div className="follow-badge">⚽</div><div><b>{teamName(selectedTeam)}</b><small>{(rows.find(r=>r.id===selectedTeam)?.points ?? 0) + " امتیاز · " + (rows.find(r=>r.id===selectedTeam)?.played ?? 0) + " بازی"}</small></div><div className="follow-actions"><a href="#matches" onClick={() => playSound("whoosh")}>بازی‌ها</a><a href="#standings" onClick={() => playSound("whoosh")}>جدول</a></div></div>
-        <div className="match-list public-match-list">{myMatches.slice(0,6).map(m => <div className="match" key={m.id}><div className="match-date">{m.scheduled_at ? new Date(m.scheduled_at).toLocaleString("fa-IR",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "بدون زمان"}<span className={m.status === "completed" ? "done" : m.status === "live" ? "live-label" : "next"}>{m.status === "completed" ? "پایان" : m.status === "live" ? "LIVE" : "بعدی"}</span></div><div className="teams"><span>{teamName(m.home_team_id)}</span><b>{m.status === "scheduled" ? "—" : (m.home_score ?? 0) + " - " + (m.away_score ?? 0)}</b><span>{teamName(m.away_team_id)}</span></div></div>)}</div>
+        <div className="match-list public-match-list">{myMatches.slice(0,6).map(m => <div className="match" key={m.id}><div className="match-date">{m.scheduled_at ? new Date(m.scheduled_at).toLocaleString("fa-IR",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "بدون زمان"}<span className={m.status === "completed" ? "done" : m.status === "live" ? "live-label" : "next"}>{m.status === "completed" ? "پایان" : m.status === "live" ? "LIVE" : "بعدی"}</span></div><div className="teams"><span>{teamName(m.home_team_id)}<small>{teamClass(m.home_team_id)}</small></span><b>{m.status === "scheduled" ? "—" : (m.home_score ?? 0) + " - " + (m.away_score ?? 0)}</b><span>{teamName(m.away_team_id)}<small>{teamClass(m.away_team_id)}</small></span></div></div>)}</div>
       </section>
       <section className="public-section season-ticker"><div className="ticker-track"><span>⚽ SCHOOL FOOTBALL</span><span>•</span><span>نتیجه بعدی را از دست نده</span><span>•</span><span>🏆 فصل مدرسه</span><span>•</span><span>بازی جوانمردانه، رقابت واقعی</span><span>•</span><span>⚽ SCHOOL FOOTBALL</span></div></section>
       <footer className="public-footer"><div><b>School Football</b><span>لیگ فوتبال مدرسه · نتایج و جدول در یک نگاه</span></div><button className="teacher-link" onClick={() => { playSound("whoosh"); router.push("/login"); }}>ورود معلم</button></footer>
